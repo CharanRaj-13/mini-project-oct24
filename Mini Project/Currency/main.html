@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Classification with Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        #uploaded-image {
+            margin: 20px 0;
+            max-width: 300px;
+        }
+        #label-container div {
+            font-size: 18px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div>Teachable Machine Image Model</div>
+    <input type="file" id="imageUpload" accept="image/*">
+    <img id="uploaded-image" src="#" alt="Image Preview" style="display:none;">
+    <div id="label-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script type="text/javascript">
+        // Link to your model from Teachable Machine
+        const URL = "./my_model/";
+
+        let model, labelContainer, maxPredictions;
+
+        // Initialize the model
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // Load the model and metadata
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            // Initialize the label container
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        // Call init to load the model on page load
+        init();
+
+        // Image Upload and Prediction
+        const imageUpload = document.getElementById('imageUpload');
+        const uploadedImage = document.getElementById('uploaded-image');
+
+        imageUpload.addEventListener('change', async function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+
+                // Show image preview
+                reader.onload = function(e) {
+                    uploadedImage.src = e.target.result;
+                    uploadedImage.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+
+                // Wait for the image to load before predicting
+                uploadedImage.onload = async function() {
+                    // Clear previous predictions
+                    for (let i = 0; i < maxPredictions; i++) {
+                        labelContainer.childNodes[i].innerHTML = "";
+                    }
+
+                    // Now that the image is loaded, predict using the model
+                    const prediction = await model.predict(uploadedImage);
+                    for (let i = 0; i < maxPredictions; i++) {
+                        const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                        labelContainer.childNodes[i].innerHTML = classPrediction;
+                    }
+                };
+            }
+        });
+    </script>
+</body>
+</html>

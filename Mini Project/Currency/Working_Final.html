@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Currency Prediction</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            margin: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            position: relative;
+        }
+        h1 {
+            width: 100%; /* 100% width */
+            margin: 0; /* Remove default margin */
+            text-align: center; /* Center align text */
+        }
+        #header {
+            position: relative;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .theme-toggle {
+            position: absolute;
+            top: 20px; /* 20px from top */
+            right: 20px; /* 20px from right */
+            cursor: pointer;
+            padding: 10px;
+            border: none;
+            background-color: transparent;
+            color: var(--text-color);
+            font-size: 24px;
+            transition: transform 0.3s ease;
+        }
+        .theme-toggle:hover {
+            transform: scale(1.1);
+        }
+        #upload-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+        .upload-btn {
+            padding: 15px;
+            border-radius: 50%;
+            background-color: var(--button-bg-color);
+            color: white;
+            font-size: 24px;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+        .upload-btn:hover {
+            background-color: var(--button-hover-bg-color);
+            transform: scale(1.1);
+        }
+        .upload-label {
+            margin: 20px 0;
+        }
+
+        /* Layout for image and predictions */
+        #content {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align items to the start */
+            margin: 20px 0;
+        }
+        #uploaded-image {
+            max-width: 50%; /* 50% width */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-right: 20px; /* Space between image and chart */
+            display: none; /* Hide initially */
+        }
+        #bar-chart {
+            max-width: 50%; /* 50% width */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Light Theme */
+        :root {
+            --bg-color: #f0f0f0;
+            --text-color: #333;
+            --button-bg-color: #4CAF50;
+            --button-text-color: #fff;
+            --button-hover-bg-color: #45a049;
+        }
+
+        /* Dark Theme */
+        [data-theme="dark"] {
+            --bg-color: #222;
+            --text-color: #fff;
+            --button-bg-color: #FF5722;
+            --button-text-color: #fff;
+            --button-hover-bg-color: #e64a19;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>Indian Currency Prediction</h1>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeToggleBtn">
+            <i class="fas fa-sun" id="sunIcon"></i>
+            <i class="fas fa-moon" id="moonIcon" style="display: none;"></i>
+        </button>
+    </div>
+
+    <div id="upload-container">
+        <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+        <button class="upload-btn" id="upload-file-btn"><i class="fi fi-rr-copy-image"></i></button>
+    </div>
+    <p class="upload-label">Select an image to upload</p>
+
+    <div id="content">
+        <img id="uploaded-image" src="#" alt="Image Preview">
+        <div id="bar-chart">
+            <canvas id="myChart" width="400" height="400"></canvas>
+            <div id="label-container"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script>
+        const imageUpload = document.getElementById('imageUpload');
+        const uploadedImage = document.getElementById('uploaded-image');
+        const labelContainer = document.getElementById('label-container');
+        const sunIcon = document.getElementById('sunIcon');
+        const moonIcon = document.getElementById('moonIcon');
+
+        // Theme toggle
+        function toggleTheme() {
+            const body = document.body;
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.removeAttribute('data-theme');
+                sunIcon.style.display = 'block';
+                moonIcon.style.display = 'none';
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                sunIcon.style.display = 'none';
+                moonIcon.style.display = 'block';
+            }
+        }
+
+        // Open file dialog when upload button is clicked
+        document.getElementById('upload-file-btn').addEventListener('click', () => {
+            imageUpload.click();
+        });
+
+        imageUpload.addEventListener('change', async function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    uploadedImage.src = e.target.result;
+                    uploadedImage.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                uploadedImage.onload = async function () {
+                    // Predict using the model (ensure the model is loaded)
+                    const prediction = await model.predict(uploadedImage);
+                    displayPrediction(prediction);
+                };
+            }
+        });
+
+        // Load model
+        const URL = "./my_model/";
+        let model;
+        async function initModel() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+            model = await tmImage.load(modelURL, metadataURL);
+        }
+        initModel();
+
+        function displayPrediction(prediction) {
+            const labels = [];
+            const data = [];
+
+            for (let i = 0; i < prediction.length; i++) {
+                labels.push(prediction[i].className);
+                data.push(prediction[i].probability * 100); // Convert to percentage
+            }
+
+            // Display predictions in the label container
+            labelContainer.innerHTML = "";
+            for (let i = 0; i < prediction.length; i++) {
+                const classPrediction = `${prediction[i].className}: ${prediction[i].probability.toFixed(2)}`;
+                labelContainer.innerHTML += `<div>${classPrediction}</div>`;
+            }
+
+            // Create a bar chart
+            const ctx = document.getElementById('myChart').getContext('2d');
+            if (window.barChart) {
+                window.barChart.destroy(); // Destroy existing chart instance
+            }
+            window.barChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Probability of Predictions (%)',
+                        data: data,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Probability (%)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Classes'
+                            }
+                        }
+                    },
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                        },
+                        title: {
+                            display: true,
+                            text: 'Prediction Probability Distribution'
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
